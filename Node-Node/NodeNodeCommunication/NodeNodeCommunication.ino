@@ -9,24 +9,32 @@ void setup() {
   // show that the program started sucessfully by flashing LED 5 times
   showUploadComplete();
 
+  // run function to reset the device, and boot it 
   setup_device();
 
-  Serial.println(get_device_ID());
-
-  enable_led_usage();
-  set_led_time(0b00100000);
-  enable_led_blink(true);
-  turn_on_leds(true, true, true, true);
-
-  uint8_t* reg = get_led_ctrl_reg();
-  for (int i=0; i<4; i++) {
-    Serial.println(reg[i], BIN);
+  // function to set the channel to UWB 5
+  while(!set_channel(5)) {
+    Serial.println("Error: Unable to set channel");
+    delay(5000);
   }
+
+  /*
+
+    Perform additional set up here
+
+  */
+  print_full_reg(read(PMSC, SEQ_CTRL, SEQ_CTRL_LEN), SEQ_CTRL_LEN);
+  // set the device to idle mode
+  set_to_idle();
 }
 
 void loop() {
   
   delay(1000);
+
+  print_full_reg(read(PMSC, SEQ_CTRL, SEQ_CTRL_LEN), SEQ_CTRL_LEN);
+
+  Serial.println(get_tse_state());
 }
 
 
@@ -41,4 +49,15 @@ void showUploadComplete() {
   }
 
   Serial.println("Upload complete. Program starting...");
+}
+
+
+void print_full_reg(uint8_t* data, int len) {
+  uint32_t full_reg = 0;
+
+  for (int i = 0; i<len; i++) {
+    full_reg += (((uint32_t) data[i]) << i*8);
+  }
+
+  Serial.println(full_reg, HEX);
 }

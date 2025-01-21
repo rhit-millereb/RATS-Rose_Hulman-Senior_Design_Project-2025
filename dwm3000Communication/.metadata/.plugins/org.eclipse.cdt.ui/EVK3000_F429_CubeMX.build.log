@@ -1,0 +1,14 @@
+21:48:41 **** Build of configuration API_tests_examples for project EVK3000_F429_CubeMX ****
+make all 
+arm-none-eabi-gcc -mcpu=cortex-m4 -g3 -c -x assembler-with-cpp -MMD -MP -MF"startup/startup_stm32f429xx.d" -MT"startup/startup_stm32f429xx.o"  -mfpu=fpv4-sp-d16 -mfloat-abi=softfp -mthumb -o "startup/startup_stm32f429xx.o" "../startup/startup_stm32f429xx.s"
+arm-none-eabi-gcc "../platform/deca_mutex.c" -mcpu=cortex-m4 -std=c11 -g3 '-D__weak=__attribute__((weak))' '-D__packed=__attribute__((__packed__))' -DUSE_HAL_DRIVER -DSTM32F429xx -DALL_TESTS_COMPILED -c -I"C:/Users/millereb/Documents/DW3XXX_API_rev9p3/DW3XXX_API_rev9p3/API/Shared/dwt_uwb_driver/Inc" -I"C:/Users/millereb/Documents/DW3XXX_API_rev9p3/DW3XXX_API_rev9p3/API/Build_Platforms/STM_Nucleo_F429/Inc" -I"C:/Users/millereb/Documents/DW3XXX_API_rev9p3/DW3XXX_API_rev9p3/API/Src/examples/examples_info" -I"C:/Users/millereb/Documents/DW3XXX_API_rev9p3/DW3XXX_API_rev9p3/API/Build_Platforms/STM_Nucleo_F429/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc" -I"C:/Users/millereb/Documents/DW3XXX_API_rev9p3/DW3XXX_API_rev9p3/API/Build_Platforms/STM_Nucleo_F429/Middlewares/ST/STM32_USB_Device_Library/Core/Inc" -I"C:/Users/millereb/Documents/DW3XXX_API_rev9p3/DW3XXX_API_rev9p3/API/Src/examples/shared_data" -I"C:/Users/millereb/Documents/DW3XXX_API_rev9p3/DW3XXX_API_rev9p3/API/Build_Platforms/STM_Nucleo_F429/Drivers/CMSIS/Device/ST/STM32F4xx/Include" -I"C:/Users/millereb/Documents/DW3XXX_API_rev9p3/DW3XXX_API_rev9p3/API/Build_Platforms/STM_Nucleo_F429/Drivers/CMSIS/Include" -I"C:/Users/millereb/Documents/DW3XXX_API_rev9p3/DW3XXX_API_rev9p3/API/Build_Platforms/STM_Nucleo_F429/Drivers/STM32F4xx_HAL_Driver/Inc" -I"C:/Users/millereb/Documents/DW3XXX_API_rev9p3/DW3XXX_API_rev9p3/API/Src" -I"C:/Users/millereb/Documents/DW3XXX_API_rev9p3/DW3XXX_API_rev9p3/API/Src/MAC_802_15_4" -I"C:/Users/millereb/Documents/DW3XXX_API_rev9p3/DW3XXX_API_rev9p3/API/Src/MAC_802_15_8" -I"C:/Users/millereb/Documents/DW3XXX_API_rev9p3/DW3XXX_API_rev9p3/API/Build_Platforms/STM_Nucleo_F429/platform" -O0 -ffunction-sections -Wall -Wextra -pedantic -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"platform/deca_mutex.d" -MT"platform/deca_mutex.o"  -mfpu=fpv4-sp-d16 -mfloat-abi=softfp -mthumb -o "platform/deca_mutex.o"
+In file included from ../platform/deca_mutex.c:14:
+C:/Users/millereb/Documents/DW3XXX_API_rev9p3/DW3XXX_API_rev9p3/API/Build_Platforms/STM_Nucleo_F429/platform/port.h:146:16: error: unknown type name 'useconds_t'
+  146 |     int usleep(useconds_t usec);
+      |                ^~~~~~~~~~
+make[1]: *** [platform/subdir.mk:31: platform/deca_mutex.o] Error 1
+make: *** [makefile:107: all] Error 2
+"make all" terminated with exit code 2. Build might be incomplete.
+
+21:48:46 Build Failed. 3 errors, 0 warnings. (took 4s.846ms)
+

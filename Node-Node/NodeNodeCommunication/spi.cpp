@@ -10,15 +10,14 @@ uint8_t reverse(uint8_t b) {
 }
 
 void setup_spi() {
-  Serial.println("Setting up SPI...");
+  // set the IRQ to input
+  pinMode(IRQ, INPUT);
 
   // set the chip select pin to output
   pinMode(SS, OUTPUT);
 
   // init the SPI communication library
   SPI.begin();
-
-  Serial.println("SPI setup sucessful\n");
 }
 
 void start(uint8_t reg, uint8_t offset, bool write) {
