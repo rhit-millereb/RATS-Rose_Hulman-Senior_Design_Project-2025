@@ -95,3 +95,7 @@ uint8_t* read(uint8_t reg, uint8_t offset, uint8_t bytes_to_read) {
 }
 
 
+void fast_command(uint8_t cmd) {
+  
+}
+

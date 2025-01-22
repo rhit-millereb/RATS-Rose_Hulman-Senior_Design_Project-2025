@@ -26,13 +26,13 @@ void setup() {
   print_full_reg(read(PMSC, SEQ_CTRL, SEQ_CTRL_LEN), SEQ_CTRL_LEN);
   // set the device to idle mode
   set_to_idle();
+
+  transmit_message("Hello World!!", 13);
 }
 
 void loop() {
   
   delay(1000);
-
-  print_full_reg(read(PMSC, SEQ_CTRL, SEQ_CTRL_LEN), SEQ_CTRL_LEN);
 
   Serial.println(get_tse_state());
 }

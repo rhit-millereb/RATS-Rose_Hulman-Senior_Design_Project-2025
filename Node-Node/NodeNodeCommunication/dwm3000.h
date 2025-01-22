@@ -17,6 +17,7 @@
 #define RX_BUFFER_0   0x12
 #define RX_BUFFER_1   0x13
 #define TX_BUFFER     0x14
+  #define TX_BUFFER_LEN 0x3000
 
 
 //GEN CONFIG DATA OFFSETS
@@ -35,6 +36,11 @@
   #define SPI_RD_CRC_LEN  0x04
 #define SYS_TIME          0x1C  // System time counter
   #define SYS_TIME_LEN    0x08
+
+#define TX_FCTRL_1        0x24  // first reg with frame control: offset, length
+  #define TX_FCTRL_1_LEN  0x04
+#define TX_FCTRL_2        0x28  // second reg with frame control: Fine PSR
+  #define TX_FCTRL_2_LEN  0x04
 
 #define SYS_CTRL          0x38  // system control flags
   #define SYS_CTL_LEN     0x04
@@ -178,6 +184,12 @@ MachineState get_machine_state();
 uint8_t get_tx_state();
 uint8_t get_rx_state();
 uint8_t get_tse_state();
+
+
+
+// functions to transmit a message from the device
+bool transmit_message(String msg, int len);
+
 
 
 // LED FUNCTIONS

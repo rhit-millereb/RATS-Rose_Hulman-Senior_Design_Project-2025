@@ -192,6 +192,61 @@ void set_to_idle() {
 }
 
 
+
+
+bool transmit_message(String msg, int len) {
+  // ensure the data fits size requirements
+  if (len <= 0) {
+    Serial.println("Error: Invalid transmit frame length");
+    return false;
+  } else if (len >= 127) {
+    Serial.println("Error: Transmit frame too large (127 bytes max)");
+    return false;
+  }
+
+  // create data of size len+1 to include null terminator and end-of-text terminator
+  uint8_t data[len+1] = {};
+
+  msg.toCharArray(data, len+1, 0);
+
+  // write the message to the transmit buffer
+  write(TX_BUFFER, 0x0, data, len+1);
+
+
+
+  // configure transmit parameters
+  uint8_t* config_data = read(GEN_CFG_AES_0, TX_FCTRL_1, TX_FCTRL_1_LEN);
+  // combine data into one 32bit int
+  uint32_t tx_fctrl = 0;
+  for (int i=0; i<4; i++) {
+    tx_fctrl += (((uint32_t) config_data[i]) << (i*8));
+  }
+
+  // perform operations to clear previous values and set new ones
+  // see page 85 of user manual for details
+  // set frame length
+  tx_fctrl &= ~0x1FF;
+  tx_fctrl += len;
+  // leave all other values at default
+
+  // write data back to register
+  write(GEN_CFG_AES_0, TX_FCTRL_1, data, TX_FCTRL_1_LEN);
+
+
+
+  // send transmit start command
+  fast_command(CMD_TX);
+
+
+  // wait until message is sent
+
+
+  return true;
+}
+
+
+
+
 uint8_t* get_led_ctrl_reg() {
   // get the current state of the register
   return read(PMSC, LED_CTRL, LED_CTRL_LEN);
