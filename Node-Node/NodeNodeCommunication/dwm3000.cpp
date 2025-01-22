@@ -156,8 +156,15 @@ bool set_channel(int chan) {
     return false;
   }
 
+  // the set up process to select a channel involves the setting of four different registers
+  //  1) PLL_CFG
+  //  2) RF_TX_CTRL_2
+  //  3) RF_SWITCH (only for manual control)
+  //  4) CHAN_CTRL
+
   uint8_t data[4] = {0,0,0,0};
 
+  // PLL_CFG Setting
   if (chan == 5) {
     data[0] = CHANNEL5 & 0x00FF;
     data[1] = (CHANNEL5 & 0xFF00) >> 8;
@@ -165,17 +172,75 @@ bool set_channel(int chan) {
     data[0] = CHANNEL9 & 0x00FF;
     data[1] = (CHANNEL9 & 0xFF00) >> 8;
   }
-
   write(FS_CTRL, PLL_CFG, data, PLL_CFG_LEN);
-
   delay(1);
-
+  // read PLL_CFG to ensure data written
   uint8_t* read_data = read(FS_CTRL, PLL_CFG, PLL_CFG_LEN);
-
   if (read_data[0] != data[0] || read_data[1] != data[1]) {
-    Serial.println("Error: Channel data not properly written.");
+    Serial.println("Error: PLL_CONF data not properly written.");
     return false;
   } 
+
+
+  // RF_TX_CTRL_2 Setting
+  zero_array(data, 4);
+  if (chan == 5) {
+    // x1C 07 11 34
+    data[0] = 0x34;
+    data[1] = 0x11;
+    data[2] = 0x07;
+    data[3] = 0x1C;
+  } else {
+    // x1C 01 00 34
+    data[0] = 0x34;
+    data[1] = 0x00;
+    data[2] = 0x01;
+    data[3] = 0x1C;
+  }
+  write(RF_CONF, RF_TX_CTRL_2, data, RF_TX_CTRL_2_LEN);
+  // read data back from register to confirm writing
+  read_data = read(RF_CONF, RF_TX_CTRL_2, RF_TX_CTRL_2_LEN);
+  for (int i=0; i<4; i++) {
+    if (data[i] != read_data[i]) {
+      Serial.println("Error: RF_TX_CTRL_2 data not properly written");
+      return false;
+    }
+  }
+
+
+  // RF_SWITCH Setting
+  // only needs to be set for manual control, left at default for auto control
+
+
+  // CHAN_CTRL Setting
+  zero_array(data, 4);
+  uint8_t rf_chan = -1;
+  uint8_t sfd_type = -1;
+  uint8_t tx_pcode = -1;
+  uint8_t rx_pcode = -1;
+  if (chan == 5) {
+    rf_chan = 0b0;
+  } else {
+    rf_chan = 0b1;
+  }
+  sfd_type = 0b0;
+  tx_pcode = 10;
+  rx_pcode = 10;
+  
+  data[0] |= rf_chan;
+  data[0] |= (sfd_type << 1);
+  data[0] |= (tx_pcode << 3);
+  data[1] |= rx_pcode;
+  write(GEN_CFG_AES_1, CHAN_CTRL, data, CHAN_CTRL_LEN);
+  // read data back from register to confirm writing
+  read_data = read(GEN_CFG_AES_1, CHAN_CTRL, CHAN_CTRL_LEN);
+  for (int i=0; i<2; i++) {
+    if (read_data[i] != data[i]) {
+      Serial.println("Error: CHAN_CTRL data not properly written");
+      return false;
+    }
+  }
+
   
   return true;
 }
@@ -186,7 +251,7 @@ void set_to_idle() {
   uint8_t* data = read(PMSC, SEQ_CTRL, SEQ_CTRL_LEN);
 
   // mask in the IDLE bit
-  data[1] |= (AINIT2IDLE > 8);
+  data[1] |= (AINIT2IDLE >> 8);
 
   write(PMSC, SEQ_CTRL, data, SEQ_CTRL_LEN);
 }
@@ -233,18 +298,41 @@ bool transmit_message(String msg, int len) {
   write(GEN_CFG_AES_0, TX_FCTRL_1, data, TX_FCTRL_1_LEN);
 
 
-
   // send transmit start command
   fast_command(CMD_TX);
 
 
   // wait until message is sent
+  uint8_t* event_status = read(GEN_CFG_AES_0, SYS_STATUS, SYS_STATUS_LEN);
 
+  while(true) {
+    Serial.println(event_status[0], BIN);
+    delay(5);
+  }
+
+  // clear message sent flags
 
   return true;
 }
 
+TransmitStatus get_transmit_status() {
 
+
+}
+
+
+bool has_started_transmit() {
+
+}
+
+bool has_sent_frame() {
+
+}
+
+
+void clear_transmit_status() {
+  
+}
 
 
 uint8_t* get_led_ctrl_reg() {
@@ -341,6 +429,12 @@ void turn_on_leds(bool one, bool two, bool three, bool four) {
   }
 }
 
+void zero_array(uint8_t* data, int len) {
+  for (int i=0; i<len; i++) {
+    data[i] = 0;
+  }
+}
+
 void bit_or_arrays(uint8_t* data, uint8_t* mask, int len) {
   for (int i = 0; i < len; i++) {
     data[i] = data[i] | mask[i];
@@ -351,4 +445,14 @@ void bit_and_arrays(uint8_t* data, uint8_t* mask, int len) {
   for (int i = 0; i < len; i++) {
     data[i] = data[i] & mask[i];
   }
+}
+
+void print_full_reg(uint8_t* data, int len) {
+  uint32_t full_reg = 0;
+
+  for (int i = 0; i<len; i++) {
+    full_reg += (((uint32_t) data[i]) << i*8);
+  }
+
+  Serial.println(full_reg, HEX);
 }

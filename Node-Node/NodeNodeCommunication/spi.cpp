@@ -96,6 +96,37 @@ uint8_t* read(uint8_t reg, uint8_t offset, uint8_t bytes_to_read) {
 
 
 void fast_command(uint8_t cmd) {
-  
+  // ensure the command is valid
+  if (cmd > 0x13) {
+    Serial.println("Error: Invalid fast command");
+    return;
+  }
+
+  // create the send byte
+  uint8_t data = 0;
+
+  // set the first two bits to fast header
+  data |= 0b10000000;
+  // set the trailer bit
+  data |= 0b00000001;
+
+  // set the command code
+  data |= (cmd << 1);
+
+  Serial.println(data);
+
+  // start an SPI transation with settings
+  SPI.beginTransaction(SPISettings(130000, MSBFIRST, SPI_MODE0));
+  // set the chip select to LOW
+  digitalWrite(SS, LOW);
+
+  delay(5);
+
+  // transfer the fast command
+  SPI.transfer(data);
+
+  delay(5);
+
+  end();
 }
 

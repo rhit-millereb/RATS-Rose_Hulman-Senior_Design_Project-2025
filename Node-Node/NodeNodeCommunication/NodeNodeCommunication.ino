@@ -23,7 +23,7 @@ void setup() {
     Perform additional set up here
 
   */
-  print_full_reg(read(PMSC, SEQ_CTRL, SEQ_CTRL_LEN), SEQ_CTRL_LEN);
+  //print_full_reg(read(PMSC, SEQ_CTRL, SEQ_CTRL_LEN), SEQ_CTRL_LEN);
   // set the device to idle mode
   set_to_idle();
 
@@ -49,15 +49,4 @@ void showUploadComplete() {
   }
 
   Serial.println("Upload complete. Program starting...");
-}
-
-
-void print_full_reg(uint8_t* data, int len) {
-  uint32_t full_reg = 0;
-
-  for (int i = 0; i<len; i++) {
-    full_reg += (((uint32_t) data[i]) << i*8);
-  }
-
-  Serial.println(full_reg, HEX);
 }

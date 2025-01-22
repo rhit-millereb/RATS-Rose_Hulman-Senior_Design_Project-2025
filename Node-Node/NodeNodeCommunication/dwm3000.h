@@ -9,6 +9,8 @@
 #define EXT_SYNC      0x04
 #define GPIO_CTRL     0x05
 
+#define RF_CONF       0x07
+
 #define FS_CTRL       0x09
 
 #define DIG_DIAG      0x0F
@@ -75,6 +77,12 @@
   #define GPIO_IRQE_LEN   0x04
 #define GPIO_ISTS         0x14  // interrupt status register
   #define GPIO_ISTS_LEN   0x04
+
+
+// RF CONFIGURATION DATA OFFETS
+#define RF_TX_CTRL_2      0x1C  // configuration of the TX channel register
+  #define RF_TX_CTRL_2_LEN 0x04
+
 
 
 // FREQUENCY CONTROL DATA OFFSETS
@@ -189,7 +197,24 @@ uint8_t get_tse_state();
 
 // functions to transmit a message from the device
 bool transmit_message(String msg, int len);
+class TransmitStatus{
+  public:
+    bool start_send = false;
+    bool sent_preamble = false;
+    bool sent_header = false;
+    bool sent_frame = false;
 
+    TransmitStatus(bool start, bool preamble, bool header, bool frame) {
+      start_send = start;
+      sent_preamble = preamble;
+      sent_header = header;
+      sent_frame = frame;
+    };
+};
+TransmitStatus get_transmit_status();
+bool has_started_transmit();
+bool has_sent_frame();
+void clear_transmit_status();
 
 
 // LED FUNCTIONS
@@ -199,10 +224,12 @@ void set_led_time(uint8_t time);
 void enable_led_blink(bool enable);
 void turn_on_leds(bool one, bool two, bool three, bool four);
 
+
+
 void bit_or_arrays(uint8_t* data, uint8_t* mask, int len);
-
 void bit_and_arrays(uint8_t* data, uint8_t* mask, int len);
-
+void zero_array(uint8_t* data, int len);
+void print_full_reg(uint8_t* data, int len);
 
 
 
