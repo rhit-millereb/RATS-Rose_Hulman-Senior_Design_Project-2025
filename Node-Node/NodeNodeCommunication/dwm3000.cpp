@@ -278,7 +278,6 @@ bool transmit_message(String msg, int len) {
   write(TX_BUFFER, 0x0, data, len+1);
 
 
-
   // configure transmit parameters
   uint8_t* config_data = read(GEN_CFG_AES_0, TX_FCTRL_1, TX_FCTRL_1_LEN);
   // combine data into one 32bit int
@@ -286,6 +285,8 @@ bool transmit_message(String msg, int len) {
   for (int i=0; i<4; i++) {
     tx_fctrl += (((uint32_t) config_data[i]) << (i*8));
   }
+
+  Serial.println("here");
 
   // perform operations to clear previous values and set new ones
   // see page 85 of user manual for details
@@ -301,37 +302,82 @@ bool transmit_message(String msg, int len) {
   // send transmit start command
   fast_command(CMD_TX);
 
-
+  int timer = 0;
   // wait until message is sent
-  uint8_t* event_status = read(GEN_CFG_AES_0, SYS_STATUS, SYS_STATUS_LEN);
+  Serial.println("Beginning transmission...");
+  while(!has_started_transmit()) {
+    if (timer > 10) {
+      Serial.println("Error: Timed out trying to send message...");
+      return false;
+    }
 
-  while(true) {
-    Serial.println(event_status[0], BIN);
-    delay(5);
+    Serial.println("    Beginning...");
+    delay(100);
+
+    timer += 1;
+  }
+
+  timer = 0;
+  while(!has_sent_frame()) {
+    if (timer > 10) {
+      Serial.println("Error: Timed out trying to send message...");
+      return false;
+    }
+
+    Serial.println("    Sending...");
+    delay(100);
+
+    timer += 1;
   }
 
   // clear message sent flags
+  clear_transmit_status();
+
+  Serial.println("===== Message Sent! =====");
 
   return true;
 }
 
 TransmitStatus get_transmit_status() {
+  uint8_t* reg_data = read(GEN_CFG_AES_0, SYS_STATUS, SYS_STATUS_LEN);
 
+  // see pg 94 of the user manual for a diagram of the bit conversion
+  uint8_t begin_status = (reg_data[0] & 0b00010000) >> 4;
+  uint8_t pream_status = (reg_data[0] & 0b00100000) >> 5;
+  uint8_t head_status = (reg_data[0] & 0b01000000) >> 6;
+  uint8_t done_status = (reg_data[0] & 0b10000000) >> 7;
 
+  TransmitStatus status = TransmitStatus(begin_status, pream_status, head_status, done_status);
+
+  return status;
 }
 
 
 bool has_started_transmit() {
-
+  return get_transmit_status().start_send;
 }
 
 bool has_sent_frame() {
-
+  return get_transmit_status().sent_frame;
 }
 
 
 void clear_transmit_status() {
-  
+  uint8_t* reg_data = new uint8_t[SYS_STATUS_LEN];
+
+  // show ones to the transmit flag bits
+  reg_data[0] = 0b11110000;
+
+  // write data to register, writing a one clears the flag
+  write(GEN_CFG_AES_0, SYS_STATUS, reg_data, SYS_STATUS_LEN);
+
+  // pull the data to ensure the flags were cleared
+  reg_data = read(GEN_CFG_AES_0, SYS_STATUS, SYS_STATUS_LEN);
+  if ((reg_data[0] & 0b11110000) != 0) {
+    Serial.println("Error: Could not clear transmit event flags. Next transmit will stall...");
+  }
+
+  return;
 }
 
 

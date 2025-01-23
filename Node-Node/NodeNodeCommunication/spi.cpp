@@ -62,6 +62,8 @@ void end() {
   digitalWrite(SS, HIGH);
   // end the transaction
   SPI.endTransaction();
+
+  delay(5);
 }
 
 void write(uint8_t reg, uint8_t offset, uint8_t* data, int len) {
@@ -112,8 +114,6 @@ void fast_command(uint8_t cmd) {
 
   // set the command code
   data |= (cmd << 1);
-
-  Serial.println(data);
 
   // start an SPI transation with settings
   SPI.beginTransaction(SPISettings(130000, MSBFIRST, SPI_MODE0));
