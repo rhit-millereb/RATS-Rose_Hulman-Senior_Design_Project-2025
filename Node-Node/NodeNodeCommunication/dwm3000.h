@@ -217,6 +217,27 @@ bool has_sent_frame();
 void clear_transmit_status();
 
 
+// functions to receive a message
+String get_received_message();
+class ReceiveStatus {
+  public:
+    bool preamble_detected = false;
+    bool sfd_detected = false;
+    bool header_detected = false;
+    bool data_frame_ready = false;
+
+    ReceiveStatus(bool preamble, bool sfd, bool header, bool data) {
+      preamble_detected = preamble;
+      sfd_detected = sfd;
+      header_detected = header;
+      data_frame_ready = data;
+    }
+};
+ReceiveStatus get_receive_status();
+bool has_received_frame();
+void clear_receive_flags();
+
+
 // LED FUNCTIONS
 void enable_led_usage();
 uint8_t* get_led_ctrl_reg();

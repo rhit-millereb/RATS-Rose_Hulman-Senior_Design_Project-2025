@@ -33,6 +33,10 @@ void loop() {
 
   delay(1000);
 
+  //fast_command(CMD_RX);
+
+  //Serial.println(has_received_frame());
+
   transmit_message("Hello World!!", 13);
 
   //Serial.println(get_tse_state());

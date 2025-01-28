@@ -286,8 +286,6 @@ bool transmit_message(String msg, int len) {
     tx_fctrl += (((uint32_t) config_data[i]) << (i*8));
   }
 
-  Serial.println("here");
-
   // perform operations to clear previous values and set new ones
   // see page 85 of user manual for details
   // set frame length
@@ -379,6 +377,32 @@ void clear_transmit_status() {
 
   return;
 }
+
+
+
+String get_received_message() {
+
+}
+
+ReceiveStatus get_receive_status() {
+
+}
+
+bool has_received_frame() {
+  uint8_t* reg_data = read(GEN_CFG_AES_0, SYS_STATUS, SYS_STATUS_LEN);
+
+  uint8_t* flag = reg_data[1] & 0b00100000;
+
+  return flag > 0;
+}
+
+void clear_receive_flags() {
+
+}
+
+
+
+
 
 
 uint8_t* get_led_ctrl_reg() {
