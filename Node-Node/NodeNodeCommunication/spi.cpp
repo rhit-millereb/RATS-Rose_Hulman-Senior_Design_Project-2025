@@ -2,6 +2,9 @@
 #include "spi.h"
 
 
+bool full_speed = false;
+
+
 uint8_t reverse(uint8_t b) {
    b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
    b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
@@ -10,11 +13,14 @@ uint8_t reverse(uint8_t b) {
 }
 
 void setup_spi() {
-  // set the IRQ to input
-  pinMode(IRQ, INPUT);
-
   // set the chip select pin to output
   pinMode(SS, OUTPUT);
+  digitalWrite(SS, HIGH);
+  
+  // set the master out, slave in to output (messages sent on this pin)
+  pinMode(MOSI, OUTPUT);
+  // set the master in, slave out to input (messages received on this pin)
+  pinMode(MISO, INPUT);
 
   // init the SPI communication library
   SPI.begin();
@@ -43,12 +49,18 @@ void start(uint8_t reg, uint8_t offset, bool write) {
   header[1] = 0x00;
   header[1] |= (offset) << 2; // add in the 6 remaining bits in register offset
 
+  // determine the transfer speed that should be used
+  int speed = 0;
+  if (full_speed) {
+    speed = SPI_FULL_SPEED;
+  } else {
+    speed = SPI_LOW_SPEED;
+  }
+
   // start an SPI transation with settings
-  SPI.beginTransaction(SPISettings(130000, MSBFIRST, SPI_MODE0));
+  SPI.beginTransaction(SPISettings(speed, MSBFIRST, SPI_MODE0));
   // set the chip select to LOW
   digitalWrite(SS, LOW);
-
-  delay(5);
 
   // write the header over the SPI wire
   for (int i=0; i<2; i++) {
@@ -57,13 +69,10 @@ void start(uint8_t reg, uint8_t offset, bool write) {
 }
 
 void end() {
-  delay(5);
   // set the chip select to high
   digitalWrite(SS, HIGH);
   // end the transaction
   SPI.endTransaction();
-
-  delay(5);
 }
 
 void write(uint8_t reg, uint8_t offset, uint8_t* data, int len) {
@@ -120,12 +129,8 @@ void fast_command(uint8_t cmd) {
   // set the chip select to LOW
   digitalWrite(SS, LOW);
 
-  delay(5);
-
   // transfer the fast command
   SPI.transfer(data);
-
-  delay(5);
 
   end();
 }

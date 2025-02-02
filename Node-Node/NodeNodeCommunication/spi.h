@@ -24,6 +24,10 @@
 #define CMD_CLEAR_IRQS  0x12  // clear all interrupt events
 
 
+#define SPI_LOW_SPEED 2000000     // 2 MHz low speed transfer
+#define SPI_FULL_SPEED 38000000   // 15 MHz full speed transfer
+
+extern bool full_speed;
 
 void setup_spi();
 

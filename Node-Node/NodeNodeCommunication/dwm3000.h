@@ -137,9 +137,14 @@
 #define AINIT2IDLE  0b100000000 // index of bit for the AINIT2IDLE in the SEQ_CTRL 
 
 
+#define DEFAULT_SYS_CONFIG {0xC8, 0x11, 0x04, 0x00}
 
 
 void setup_device();
+
+
+
+
 
 class DeviceID {
   public:

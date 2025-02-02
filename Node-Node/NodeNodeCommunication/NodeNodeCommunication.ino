@@ -1,5 +1,8 @@
 #include "dwm3000.h"
 
+#define TX_EN true;
+
+
 void setup() {
   delay(3000);
   // setup a serial connection to the board
@@ -26,12 +29,20 @@ void setup() {
 
   // set the device to idle mode
   set_to_idle();
+
+  // set sleep parameters
+  uint8_t data[2] = {0b1100, 0b0001};
+  write(0x0A, 0x14, data, 0x02);
 }
 
 void loop() {
-  //print_full_reg(read(0x0A, 0x14, 0x1), 0x1);
+  //print_full_reg(read(0x0A, 0x14, 0x2), 0x2);
 
   delay(1000);
+
+  if (TX_EN) {
+    transmis_message("Hello World!!", 13);
+  }
 
   //fast_command(CMD_RX);
 
@@ -39,19 +50,23 @@ void loop() {
 
   transmit_message("Hello World!!", 13);
 
-  //Serial.println(get_tse_state());
+  Serial.println(get_tse_state());
 }
 
 
 void showUploadComplete() {
   int i = 0;
   while (i<4) {
-    digitalWrite(LED_BUILTIN, 1);
-    delay(100);
-    digitalWrite(LED_BUILTIN, 0);
-    delay(100);
+    blink_led(100);
     i+=1;
   }
 
   Serial.println("Upload complete. Program starting...");
+}
+
+void blink_led(int period) {
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(period);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(preiod);
 }
