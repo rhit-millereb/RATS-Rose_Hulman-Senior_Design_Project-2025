@@ -34,7 +34,7 @@ void setup_device() {
   Serial.println("Awaiting Device to Boot...");
   delay(1);
   while(get_tse_state() != 1) {
-    Serial.print("\tWaiting...");
+    Serial.println("\tWaiting...");
     delay(10);
   }
   Serial.println("Device Booted Successfully.");
@@ -56,7 +56,8 @@ void setup_device() {
 
 DeviceID get_device_ID() {
   // see DWM3000 user manual, pg 74 to see the DEV_ID fields
-  uint8_t* data = read(GEN_CFG_AES_0, DEV_ID, DEV_ID_LEN);
+  uint8_t* data = new uint8_t[4];
+  read(GEN_CFG_AES_0, DEV_ID, data, DEV_ID_LEN);
 
   uint8_t rev = data[0] & 0x0F;
 
@@ -122,14 +123,20 @@ void reset_DWIC(void) {
 
 
 MachineState get_machine_state() {
+  uint8_t* data = new uint8_t[4];
+
   // read the sys_state register
-  uint8_t* data = read(DIG_DIAG, SYS_STATE, SYS_STATE_LEN);
+  read(DIG_DIAG, SYS_STATE, data, SYS_STATE_LEN);
+
+  // convert the data from items in an array to standalone variables (prevent mem leak)
+  int tx = data[0];
+  int rx = data[1];
+  int tse = data[2];
+  free(data);
 
   // set the btyes to their respective values
   //  see user manual, pg 216 for details
-  MachineState* state = new MachineState(data[0], data[1], data[2]);
-
-  return *state;
+  return MachineState(tx, rx, tse);
 }
 
 uint8_t get_tx_state() {
@@ -137,7 +144,6 @@ uint8_t get_tx_state() {
   MachineState data = get_machine_state();
 
   int state = data.tx_state;
-  //delete &data;
 
   return state;
 }
@@ -155,7 +161,9 @@ uint8_t get_tse_state() {
   // get data from the sys state register
   MachineState data = get_machine_state();
 
-  return data.tse_state;
+  int state = data.tse_state;
+
+  return state;
 }
 
 
@@ -194,7 +202,8 @@ bool set_channel(int chan) {
   data[1] |= rx_pcode;
   write(GEN_CFG_AES_1, CHAN_CTRL, data, CHAN_CTRL_LEN);
   // read data back from register to confirm writing
-  uint8_t* read_data = read(GEN_CFG_AES_1, CHAN_CTRL, CHAN_CTRL_LEN);
+  uint8_t* read_data = new uint8_t[4];
+  read(GEN_CFG_AES_1, CHAN_CTRL, read_data, CHAN_CTRL_LEN);
   for (int i=0; i<2; i++) {
     if (read_data[i] != data[i]) {
       Serial.println(data[1], BIN);
@@ -217,7 +226,7 @@ bool set_channel(int chan) {
   write(FS_CTRL, PLL_CFG, data, PLL_CFG_LEN);
   delay(1);
   // read PLL_CFG to ensure data written
-  read_data = read(FS_CTRL, PLL_CFG, PLL_CFG_LEN);
+  read(FS_CTRL, PLL_CFG, read_data, PLL_CFG_LEN);
   if (read_data[0] != data[0] || read_data[1] != data[1]) {
     Serial.println("Error: PLL_CONF data not properly written.");
     return false;
@@ -241,7 +250,7 @@ bool set_channel(int chan) {
   }
   write(RF_CONF, RF_TX_CTRL_2, data, RF_TX_CTRL_2_LEN);
   // read data back from register to confirm writing
-  read_data = read(RF_CONF, RF_TX_CTRL_2, RF_TX_CTRL_2_LEN);
+  read(RF_CONF, RF_TX_CTRL_2, read_data, RF_TX_CTRL_2_LEN);
   for (int i=0; i<4; i++) {
     if (data[i] != read_data[i]) {
       Serial.println("Error: RF_TX_CTRL_2 data not properly written");
@@ -260,7 +269,8 @@ bool set_channel(int chan) {
 
 void set_to_idle() {
   // read the current data from the SEQ_CTRL reg 
-  uint8_t* data = read(PMSC, SEQ_CTRL, SEQ_CTRL_LEN);
+  uint8_t* data = new uint8_t[4];
+  read(PMSC, SEQ_CTRL, data, SEQ_CTRL_LEN);
 
   // mask in the IDLE bit
   data[1] |= (AINIT2IDLE >> 8);
@@ -269,6 +279,8 @@ void set_to_idle() {
 
   // set the global variable showing full speed SPI is now possible
   full_speed = true;
+
+  return;
 }
 
 
@@ -292,14 +304,16 @@ bool transmit_message(String msg, int len) {
   // write the message to the transmit buffer
   write(TX_BUFFER, 0x0, data, len+1);
 
-
   // configure transmit parameters
-  uint8_t* config_data = read(GEN_CFG_AES_0, TX_FCTRL_1, TX_FCTRL_1_LEN);
+  uint8_t* config_data = new uint8_t[4];
+  read(GEN_CFG_AES_0, TX_FCTRL_1, config_data, TX_FCTRL_1_LEN);
   // combine data into one 32bit int
   uint32_t tx_fctrl = 0;
   for (int i=0; i<4; i++) {
     tx_fctrl += (((uint32_t) config_data[i]) << (i*8));
   }
+
+  free(config_data);
 
   // perform operations to clear previous values and set new ones
   // see page 85 of user manual for details
@@ -309,11 +323,11 @@ bool transmit_message(String msg, int len) {
   // leave all other values at default
 
   // write data back to register
-  write(GEN_CFG_AES_0, TX_FCTRL_1, data, TX_FCTRL_1_LEN);
-
+  write(GEN_CFG_AES_0, TX_FCTRL_1, tx_fctrl, TX_FCTRL_1_LEN);
 
   // send transmit start command
   fast_command(CMD_TX);
+
 
   int timer = 0;
   // wait until message is sent
@@ -352,7 +366,8 @@ bool transmit_message(String msg, int len) {
 }
 
 TransmitStatus get_transmit_status() {
-  uint8_t* reg_data = read(GEN_CFG_AES_0, SYS_STATUS, SYS_STATUS_LEN);
+  uint8_t* reg_data = new uint8_t[4];
+  read(GEN_CFG_AES_0, SYS_STATUS, reg_data, SYS_STATUS_LEN);
 
   // see pg 94 of the user manual for a diagram of the bit conversion
   uint8_t begin_status = (reg_data[0] & 0b00010000) >> 4;
@@ -360,18 +375,21 @@ TransmitStatus get_transmit_status() {
   uint8_t head_status = (reg_data[0] & 0b01000000) >> 6;
   uint8_t done_status = (reg_data[0] & 0b10000000) >> 7;
 
-  TransmitStatus status = TransmitStatus(begin_status, pream_status, head_status, done_status);
+  free(reg_data);
 
-  return status;
+  return TransmitStatus(begin_status, pream_status, head_status, done_status);
 }
 
 
 bool has_started_transmit() {
-  return get_transmit_status().start_send;
+  bool started = get_transmit_status().start_send;
+  
+  return started;
 }
 
 bool has_sent_frame() {
-  return get_transmit_status().sent_frame;
+  bool status = get_transmit_status().sent_frame;
+  return status;
 }
 
 
@@ -385,10 +403,12 @@ void clear_transmit_status() {
   write(GEN_CFG_AES_0, SYS_STATUS, reg_data, SYS_STATUS_LEN);
 
   // pull the data to ensure the flags were cleared
-  reg_data = read(GEN_CFG_AES_0, SYS_STATUS, SYS_STATUS_LEN);
+  read(GEN_CFG_AES_0, SYS_STATUS, reg_data, SYS_STATUS_LEN);
   if ((reg_data[0] & 0b11110000) != 0) {
     Serial.println("Error: Could not clear transmit event flags. Next transmit will stall...");
   }
+
+  free(reg_data);
 
   return;
 }
@@ -404,9 +424,12 @@ ReceiveStatus get_receive_status() {
 }
 
 bool has_received_frame() {
-  uint8_t* reg_data = read(GEN_CFG_AES_0, SYS_STATUS, SYS_STATUS_LEN);
+  uint8_t* reg_data = new uint8_t[4];
+  read(GEN_CFG_AES_0, SYS_STATUS, reg_data, SYS_STATUS_LEN);
 
   uint8_t* flag = reg_data[1] & 0b00100000;
+
+  free(reg_data);
 
   return flag > 0;
 }
@@ -422,12 +445,15 @@ void clear_receive_flags() {
 
 uint8_t* get_led_ctrl_reg() {
   // get the current state of the register
-  return read(PMSC, LED_CTRL, LED_CTRL_LEN);
+  uint8_t* data = new uint8_t[4];
+  read(PMSC, LED_CTRL, data, LED_CTRL_LEN);
+  return data;
 }
 
 void enable_led_usage() {
   // SET UP THE GPIO TO ALLOW LED DRIVING
-  uint8_t* reg = read(GPIO_CTRL, GPIO_MODE, GPIO_MODE_LEN);
+  uint8_t* reg = new uint8_t[4];
+  read(GPIO_CTRL, GPIO_MODE, reg, GPIO_MODE_LEN);
 
   // mask the values for the RXOKLED
   reg[0] = (reg[0] & 0xF8) | 0x1;
@@ -442,13 +468,15 @@ void enable_led_usage() {
   write(GPIO_CTRL, GPIO_MODE, reg, GPIO_MODE_LEN);
 
   // ENABLE THE CLOCK
-  reg = read(PMSC, CLK_CTRL, CLK_CTRL_LEN);
+  read(PMSC, CLK_CTRL, reg, CLK_CTRL_LEN);
 
   // toggle the DCLK enable flag
   reg[2] |= 0x1 << 2;
 
   //write data back to register
   write(PMSC, CLK_CTRL, reg, CLK_CTRL_LEN);
+
+  return;
 }
 
 void set_led_time(uint8_t time) {
@@ -462,13 +490,15 @@ void set_led_time(uint8_t time) {
   write(PMSC, LED_CTRL, reg, LED_CTRL_LEN);
 
   // read back from the register
-  reg = read(PMSC, LED_CTRL, LED_CTRL_LEN);
+  read(PMSC, LED_CTRL, reg, LED_CTRL_LEN);
   // confirm the data was written
   if (reg[0] != time) {
     Serial.println("Error: Delay time was not written to register");
   } else {
     Serial.println("Success: Delay time set to board");
   }
+
+  return;
 }
 
 void enable_led_blink(bool enable) {
@@ -483,7 +513,7 @@ void enable_led_blink(bool enable) {
   // write the new data to the register
   write(PMSC, LED_CTRL, reg, LED_CTRL_LEN);
 
-  reg = read(PMSC, LED_CTRL, LED_CTRL_LEN);
+  read(PMSC, LED_CTRL, reg, LED_CTRL_LEN);
 
   if (reg[1] & 0x01 != enable) {
     Serial.println("Error: Enable was not written");
@@ -506,7 +536,7 @@ void turn_on_leds(bool one, bool two, bool three, bool four) {
   write(PMSC, LED_CTRL, reg, LED_CTRL_LEN);
 
   //read data back from the register
-  reg = read(PMSC, LED_CTRL, LED_CTRL_LEN);
+  read(PMSC, LED_CTRL, reg, LED_CTRL_LEN);
   if ((reg[2] & 0x0F) != mask) {
     Serial.println("Error: LED toggles not written");
   } else {

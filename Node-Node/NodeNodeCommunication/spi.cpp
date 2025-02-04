@@ -67,7 +67,7 @@ void start(uint8_t reg, uint8_t offset, bool write) {
     SPI.transfer(header[i]);
   }
 
-  delete header;
+  free(header);
 
   return;
 }
@@ -93,13 +93,10 @@ void write(uint8_t reg, uint8_t offset, uint8_t* data, int len) {
   // run function to end the transaction
   end();
 
-
   return;
 }
 
-uint8_t* read(uint8_t reg, uint8_t offset, uint8_t bytes_to_read) {
-  uint8_t* data = new uint8_t[bytes_to_read];
-
+uint8_t* read(uint8_t reg, uint8_t offset, uint8_t* data, uint8_t bytes_to_read) {
   // run function to start the transation and tell device the register to read
   start(reg, offset, false);
 

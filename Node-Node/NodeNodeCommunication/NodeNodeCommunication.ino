@@ -1,7 +1,8 @@
 #include "dwm3000.h"
 
-#define TX_EN false
+#define TX_EN true
 
+String msg = "";
 
 void setup() {
   delay(3000);
@@ -33,6 +34,8 @@ void setup() {
   // set sleep parameters
   uint8_t data[2] = {0b1100, 0b0001};
   write(0x0A, 0x14, data, 0x02);
+
+  msg = String("Hello World!!");
 }
 
 void loop() {
@@ -41,7 +44,9 @@ void loop() {
   delay(1000);
 
   if (TX_EN) {
-    transmit_message("Hello World!!", 13);
+    transmit_message(msg, 13);
+
+    Serial.println(availableMemory());
   } else {
     // put the device in receive mode
     fast_command(CMD_RX);
