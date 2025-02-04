@@ -1,6 +1,6 @@
 #include "dwm3000.h"
 
-#define TX_EN true;
+#define TX_EN false
 
 
 void setup() {
@@ -41,16 +41,28 @@ void loop() {
   delay(1000);
 
   if (TX_EN) {
-    transmis_message("Hello World!!", 13);
+    transmit_message("Hello World!!", 13);
+  } else {
+    // put the device in receive mode
+    fast_command(CMD_RX);
+
+    while(true) {
+      Serial.println(get_rx_state(), HEX);
+      
+      delay(100);
+
+      Serial.println(availableMemory());
+    }
   }
+}
 
-  //fast_command(CMD_RX);
-
-  //Serial.println(has_received_frame());
-
-  transmit_message("Hello World!!", 13);
-
-  Serial.println(get_tse_state());
+int availableMemory() {
+    // Use 1024 with ATmega168
+    int size = 2048;
+    byte *buf;
+    while ((buf = (byte *) malloc(--size)) == NULL);
+        free(buf);
+    return size;
 }
 
 
@@ -68,5 +80,5 @@ void blink_led(int period) {
   digitalWrite(LED_BUILTIN, HIGH);
   delay(period);
   digitalWrite(LED_BUILTIN, LOW);
-  delay(preiod);
+  delay(period);
 }

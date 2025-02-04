@@ -127,21 +127,28 @@ MachineState get_machine_state() {
 
   // set the btyes to their respective values
   //  see user manual, pg 216 for details
-  return MachineState(data[0], data[1], data[2]);
+  MachineState* state = new MachineState(data[0], data[1], data[2]);
+
+  return *state;
 }
 
 uint8_t get_tx_state() {
   // get data from sys state register
   MachineState data = get_machine_state();
 
-  return data.tx_state;
+  int state = data.tx_state;
+  //delete &data;
+
+  return state;
 }
 
 uint8_t get_rx_state() {
   // get data from sys state register
   MachineState data = get_machine_state();
 
-  return data.rx_state;
+  int state = data.rx_state;
+
+  return state;
 }
 
 uint8_t get_tse_state() {

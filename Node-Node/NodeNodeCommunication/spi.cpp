@@ -66,6 +66,10 @@ void start(uint8_t reg, uint8_t offset, bool write) {
   for (int i=0; i<2; i++) {
     SPI.transfer(header[i]);
   }
+
+  delete header;
+
+  return;
 }
 
 void end() {
@@ -73,6 +77,8 @@ void end() {
   digitalWrite(SS, HIGH);
   // end the transaction
   SPI.endTransaction();
+
+  return;
 }
 
 void write(uint8_t reg, uint8_t offset, uint8_t* data, int len) {
@@ -86,6 +92,9 @@ void write(uint8_t reg, uint8_t offset, uint8_t* data, int len) {
 
   // run function to end the transaction
   end();
+
+
+  return;
 }
 
 uint8_t* read(uint8_t reg, uint8_t offset, uint8_t bytes_to_read) {
@@ -133,5 +142,7 @@ void fast_command(uint8_t cmd) {
   SPI.transfer(data);
 
   end();
+
+  return;
 }
 
