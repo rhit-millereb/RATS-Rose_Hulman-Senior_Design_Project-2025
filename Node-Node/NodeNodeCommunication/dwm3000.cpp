@@ -339,7 +339,7 @@ bool transmit_message(String msg, int len) {
     }
 
     Serial.println("    Beginning...");
-    delay(100);
+    delay(10);
 
     timer += 1;
   }
@@ -352,7 +352,7 @@ bool transmit_message(String msg, int len) {
     }
 
     Serial.println("    Sending...");
-    delay(100);
+    delay(10);
 
     timer += 1;
   }

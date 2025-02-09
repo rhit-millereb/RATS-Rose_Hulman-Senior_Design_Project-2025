@@ -1,6 +1,6 @@
 #include "dwm3000.h"
 
-#define TX_EN true
+#define TX_EN false
 
 String msg = "";
 
@@ -39,14 +39,11 @@ void setup() {
 }
 
 void loop() {
-  //print_full_reg(read(0x0A, 0x14, 0x2), 0x2);
 
   delay(1000);
 
   if (TX_EN) {
     transmit_message(msg, 13);
-
-    Serial.println(availableMemory());
   } else {
     // put the device in receive mode
     fast_command(CMD_RX);
@@ -61,6 +58,7 @@ void loop() {
   }
 }
 
+// get the total heap size
 int availableMemory() {
     // Use 1024 with ATmega168
     int size = 2048;
