@@ -1,5 +1,9 @@
 #include "dwm3000.h"
 
+#define TX_EN false
+
+String msg = "";
+
 void setup() {
   delay(3000);
   // setup a serial connection to the board
@@ -9,36 +13,75 @@ void setup() {
   // show that the program started sucessfully by flashing LED 5 times
   showUploadComplete();
 
+  // run function to reset the device, and boot it 
   setup_device();
 
-  Serial.println(get_device_ID());
-
-  enable_led_usage();
-  set_led_time(0b00100000);
-  enable_led_blink(true);
-  turn_on_leds(true, true, true, true);
-
-  uint8_t* reg = get_led_ctrl_reg();
-  for (int i=0; i<4; i++) {
-    Serial.println(reg[i], BIN);
+  // function to set the channel to UWB 5
+  while(!set_channel(5)) {
+    Serial.println("Error: Unable to set channel");
+    delay(5000);
   }
+
+  /*
+
+    Perform additional set up here
+
+  */
+
+  // set the device to idle mode
+  set_to_idle();
+
+  // set sleep parameters
+  uint8_t data[2] = {0b1100, 0b0001};
+  write(0x0A, 0x14, data, 0x02);
+
+  msg = String("Hello World!!");
 }
 
 void loop() {
-  
+
   delay(1000);
+
+  if (TX_EN) {
+    transmit_message(msg, 13);
+  } else {
+    // put the device in receive mode
+    fast_command(CMD_RX);
+
+    while(true) {
+      Serial.println(get_rx_state(), HEX);
+      
+      delay(100);
+
+      Serial.println(availableMemory());
+    }
+  }
+}
+
+// get the total heap size
+int availableMemory() {
+    // Use 1024 with ATmega168
+    int size = 2048;
+    byte *buf;
+    while ((buf = (byte *) malloc(--size)) == NULL);
+        free(buf);
+    return size;
 }
 
 
 void showUploadComplete() {
   int i = 0;
   while (i<4) {
-    digitalWrite(LED_BUILTIN, 1);
-    delay(100);
-    digitalWrite(LED_BUILTIN, 0);
-    delay(100);
+    blink_led(100);
     i+=1;
   }
 
   Serial.println("Upload complete. Program starting...");
+}
+
+void blink_led(int period) {
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(period);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(period);
 }
