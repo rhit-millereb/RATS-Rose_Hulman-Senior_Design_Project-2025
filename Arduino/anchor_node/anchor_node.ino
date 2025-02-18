@@ -71,6 +71,7 @@ sLonLat_t lon;
 double high;
 unsigned long time_current;
 unsigned long time_offset;
+char time_hold[20];
 
 
 
@@ -120,18 +121,26 @@ void setup()
   lon = gnss.getLon();
   high = gnss.getAlt();
 
-  time_current = utc.hour*36000000+utc.minute*60000+utc.second*1000-millis();
+  Serial.print(utc.hour);
+  Serial.print(":");
+  Serial.print(utc.minute);
+  Serial.print(":");
+  Serial.print(utc.second);
+  Serial.println();
+  
+  //time_current = (utc.hour*3600000) + (utc.minute*60000) + (utc.second*1000) - millis();
+  time_current = (2*3600000) + (47*60000) + (22*1000) - millis();
 
-  uint8_t time_hold[20];
-  snprintf(time_hold, sizeof(time_hold), time_current, "%l", time_current); 
+  snprintf(time_hold, sizeof(time_hold), "%lu", time_current); 
+  Serial.printf("TIME: %s\n",time_hold);
 
   Serial.println("Anchor Node");
   Serial.println("Setup over........");
 }
 
 void loop() {
-  AnchorLoop();
-
+  TXTime();
+  //AnchorLoop();
 }
 
 void AnchorLoop(){
@@ -169,7 +178,7 @@ void AnchorLoop(){
     if( rx_buffer[0] == 'A'){
       switch(rx_buffer[1]){
         case 'T':
-          TXTime(rx_buffer);
+          TXTime();
       }
     }
   }
@@ -180,8 +189,44 @@ void AnchorLoop(){
   }
 }
 
-void TXTime(uint8_t rx_buffer[20]){
- //Communicate current time to Roaming node
+void TXTime(){
+  uint8_t tx_msg[20];
+  char tx_msg_final[30];
+  tx_msg[0] = 'R';
+  tx_msg[1] = 'T';
+  tx_msg[2] = '\0';
+  snprintf(tx_msg_final, sizeof(tx_msg_final), "%s%s",tx_msg,time_hold);
+  Serial.printf("Message: %s", tx_msg_final);
+  /* Write frame data to DW IC and prepare transmission. See NOTE 3 below.*/
+  dwt_writetxdata(sizeof(tx_msg_final), (uint8_t *)(tx_msg_final), 0); /* Zero offset in TX buffer. */
+
+  /* In this example since the length of the transmitted frame does not change,
+   * nor the other parameters of the dwt_writetxfctrl function, the
+   * dwt_writetxfctrl call could be outside the main while(1) loop.
+   */
+  dwt_writetxfctrl(sizeof(tx_msg_final), 0, 0); /* Zero offset in TX buffer, no ranging. */
+
+  /* Start transmission. */
+  dwt_starttx(DWT_START_TX_IMMEDIATE);
+  delay(10); // Sleep(TX_DELAY_MS);
+
+  /* Poll DW IC until TX frame sent event set. See NOTE 4 below.
+   * STATUS register is 4 bytes long but, as the event we are looking at is in the first byte of the register, we can use this simplest API
+   * function to access it.*/
+  while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS_BIT_MASK))
+  {
+  };
+
+  /* Clear TX frame sent event. */
+  dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS_BIT_MASK);
+
+  Serial.println("TX Frame Sent");
+
+  /* Execute a delay between transmissions. */
+  Sleep(500);
+
+  /* Increment the blink frame sequence number (modulo 256). */
+  tx_msg[1]++;
 }
 
 
