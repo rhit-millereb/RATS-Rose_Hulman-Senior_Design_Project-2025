@@ -163,7 +163,6 @@ void RxTime() { //Need while hold to ensure stay in function till time recieve
   {
     /* Clear RX error/timeout events in the DW IC status register. */
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
-    RxTime(); //recursive to keep
   }
 
   /* Execute a delay between ranging exchanges. */
