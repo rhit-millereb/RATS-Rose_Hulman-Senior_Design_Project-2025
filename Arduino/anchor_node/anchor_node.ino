@@ -122,7 +122,8 @@ void setup()
 
   time_current = utc.hour*36000000+utc.minute*60000+utc.second*1000-millis();
 
-  //uint8_t time_hold[20] = time_current; // Figure out how to convert long to char*
+  uint8_t time_hold[20];
+  snprintf(time_hold, sizeof(time_hold), time_current, "%l", time_current); 
 
   Serial.println("Anchor Node");
   Serial.println("Setup over........");
