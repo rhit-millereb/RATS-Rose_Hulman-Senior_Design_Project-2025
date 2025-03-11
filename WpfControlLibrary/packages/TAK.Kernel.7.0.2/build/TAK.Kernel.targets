@@ -1,0 +1,18 @@
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>    
+        <x64LibDir>$(MSBuildThisFileDirectory)..\tools\x64</x64LibDir>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(Platform)' == 'x64'">
+        <NativeLibs Include="$(MSBuildThisFileDirectory)x64\*.dll" />
+        <None Include="@(NativeLibs)">
+            <Visible>false</Visible>
+            <Link>%(FileName)%(Extension)</Link>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+    <ItemGroup Condition="'$(SolutionName)' != 'WinTAK-sdk-integration' And '$(Platform)' == 'x64'">
+        <Reference Include="TAK.Engine, Version=0.0.0.0, Culture=neutral, processorArchitecture=x64">
+            <HintPath>$(x64LibDir)\TAK.Engine.dll</HintPath>
+        </Reference>
+    </ItemGroup>
+</Project>

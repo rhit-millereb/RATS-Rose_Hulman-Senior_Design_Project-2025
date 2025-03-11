@@ -8,13 +8,10 @@ from matplotlib.patches import Ellipse
 
 def main():
     P1 = numpy.array([0.0,0.0,0.0])
-    P2 = numpy.array([250.0,0.0,0.0])
-    P3 = numpy.array([125.0,125.0,0.0])
-    Roams = [0] * 4
-    Roams[0] = numpy.array([125.0,62.0,10.0])
-    Roams[1] = numpy.array([275.0,62.0,0.0])
-    Roams[2] = numpy.array([300.0,200.0,0.0])
-    Roams[3] = numpy.array([0.0,400.0,10.0])
+    P2 = numpy.array([1.0,0.0,0.0])
+    P3 = numpy.array([0.5,1,0.0])
+    Roams = [0] * 1
+    Roams[0] = numpy.array([1.5,0.5,0.0])
     #find_error(P1,P2,P3,Roams[0])
     node_sim(P1,P2,P3,Roams)
     
@@ -32,9 +29,9 @@ def node_sim(P1,P2,P3,Roams):
     for x in range(100):
         y = 0
         for Roam in Roams:
-            Roam[0] += random.uniform(-1,1)
-            Roam[1] += random.uniform(-1,1)
-            Roam[2] += random.uniform(-1,1)
+            # Roam[0] += random.uniform(-1,1)
+            # Roam[1] += random.uniform(-1,1)
+            # Roam[2] += random.uniform(-1,1)
             ranges = findrange(P1, P2, P3, Roam)
             circles1[y] =plt.Circle((P1[0],P1[1]), ranges[0], color = 'r', alpha = 0.1)
             circles2[y] =plt.Circle((P2[0],P2[1]), ranges[1], color = 'b', alpha = 0.1)
@@ -47,7 +44,7 @@ def node_sim(P1,P2,P3,Roams):
             plt.gca().add_patch(circles3[y])
             plt.grid()
             plt.draw()
-            plt.pause(1)
+            plt.pause(100)
             circles1[y].remove()
             circles2[y].remove()
             circles3[y].remove()
@@ -102,9 +99,9 @@ def find_error(P1, P2, P3, Roam):
 
 def findrange(P1, P2, P3, Roam):
     ranges = [0, 0, 0]
-    ranges[0] = sqrt(pow(P1[0]- Roam[0],2)+pow(P1[1]-Roam[1],2)+pow(P1[2]-Roam[2],2)) + random.uniform(-0.05,0.05)
-    ranges[1] = sqrt(pow(P2[0]- Roam[0],2)+pow(P2[1]-Roam[1],2)+pow(P2[2]-Roam[2],2)) + random.uniform(-0.05,0.05)
-    ranges[2] = sqrt(pow(P3[0]- Roam[0],2)+pow(P3[1]-Roam[1],2)+pow(P3[2]-Roam[2],2)) + random.uniform(-0.05,0.05)
+    ranges[0] = 1.5#sqrt(pow(P1[0]- Roam[0],2)+pow(P1[1]-Roam[1],2)+pow(P1[2]-Roam[2],2)) + random.uniform(-0.05,0.05)
+    ranges[1] = 0.93#sqrt(pow(P2[0]- Roam[0],2)+pow(P2[1]-Roam[1],2)+pow(P2[2]-Roam[2],2)) + random.uniform(-0.05,0.05)
+    ranges[2] = 1.16#sqrt(pow(P3[0]- Roam[0],2)+pow(P3[1]-Roam[1],2)+pow(P3[2]-Roam[2],2)) + random.uniform(-0.05,0.05)
     
     return ranges
 

@@ -1,0 +1,9 @@
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <ItemGroup Condition="'$(Platform)' == 'x64'">
+        <NativeLibs Include="$(MSBuildThisFileDirectory)x64\*.dll" />
+        <None Include="@(NativeLibs)">
+            <Link>%(FileName)%(Extension)</Link>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+</Project>
