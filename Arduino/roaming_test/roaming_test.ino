@@ -97,6 +97,7 @@ void setup()
   uint8_t baseMac[6];
   esp_wifi_get_mac(WIFI_IF_STA, baseMac);
   snprintf(RoamingID, sizeof(RoamingID), "%02x%02x%02x", baseMac[3], baseMac[4], baseMac[5]);
+  time_offset = millis();
   Serial.printf("RoamingID: %s\n", RoamingID);
 
   Serial.println("Roaming Node");
@@ -116,9 +117,9 @@ void loop()
 void RangeStart(){
   Serial.println("Pulse Run");
   char tx_msg[30];
-  time_offset = millis();
-  snprintf(tx_msg, sizeof(tx_msg), "AR");
-
+  long time_rn = time_current + millis();
+  snprintf(tx_msg, sizeof(tx_msg), "AP%s%ld", RoamingID, time_rn);
+  Serial.printf("Message: %s\n", tx_msg);
   int frame_length = (sizeof(tx_msg) + FCS_LEN); // The real length that is going to be transmitted
 
     /* Write frame data to DW IC and prepare transmission. See NOTE 3 below.*/
@@ -159,7 +160,6 @@ void TimeTx()
 {
   Serial.println("TimeTx Run");
   char tx_msg[30];
-  time_offset = millis();
   snprintf(tx_msg, sizeof(tx_msg), "AT");
 
   int frame_length = (sizeof(tx_msg) + FCS_LEN); // The real length that is going to be transmitted
@@ -191,7 +191,7 @@ void TimeTx()
   test_run_info((unsigned char *)"TX Frame Sent");
 
   /* Execute a delay between transmissions. */
-  delay(500);
+  delay(100);
 
   /* Increment the blink frame sequence number (modulo 256). */
   return;
