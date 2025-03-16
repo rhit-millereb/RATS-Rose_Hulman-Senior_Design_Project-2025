@@ -70,7 +70,6 @@ sLonLat_t lat;
 sLonLat_t lon;
 double high;
 unsigned long time_current;
-unsigned long time_offset;
 char time_hold[20];
 
 
@@ -83,7 +82,7 @@ void setup()
   spiBegin(PIN_IRQ, PIN_RST);
   spiSelect(PIN_SS);
 
-  delay(2); // Time needed for DW3000 to start up (transition from INIT_RC to IDLE_RC, or could wait for SPIRDY event)
+  delay(200); // Time needed for DW3000 to start up (transition from INIT_RC to IDLE_RC, or could wait for SPIRDY event)
 
   while (!dwt_checkidlerc()) // Need to make sure DW IC is in IDLE_RC before proceeding
   {
@@ -99,6 +98,8 @@ void setup()
       ;
   }
 
+  dwt_softreset();
+  delay(200);
   // Enabling LEDs here for debug so that for each TX the D1 LED will flash on DW3000 red eval-shield boards.
   dwt_setleds(DWT_LEDS_ENABLE | DWT_LEDS_INIT_BLINK);
 
@@ -106,8 +107,7 @@ void setup()
   if (dwt_configure(&config)) // if the dwt_configure returns DWT_ERROR either the PLL or RX calibration has failed the host should reset the device
   {
     UART_puts("CONFIG FAILED\r\n");
-    while (1)
-      ;
+    while (1);
   }
 
   /* Configure the TX spectrum parameters (power, PG delay and PG count) */
@@ -115,6 +115,19 @@ void setup()
 
   dwt_setrxantennadelay(RX_ANT_DLY);
   dwt_settxantennadelay(TX_ANT_DLY);
+
+  while(!gnss.begin()){
+    Serial.println("NO Deivces !");
+    delay(1000);
+  }
+
+  gnss.enablePower();      // Enable gnss power 
+
+  gnss.setGnss(eGPS);
+
+
+  // gnss.setRgbOff();
+  gnss.setRgbOn();
 
   utc = gnss.getUTC();
   lat = gnss.getLat();
@@ -190,13 +203,13 @@ void AnchorLoop(){
 }
 
 void TXTime(){
-  uint8_t tx_msg[20];
+  Serial.println("TimeTx Starting \n");
+  uint8_t tx_msg[2];
   char tx_msg_final[30];
   tx_msg[0] = 'R';
   tx_msg[1] = 'T';
-  tx_msg[2] = '\0';
   snprintf(tx_msg_final, sizeof(tx_msg_final), "%s%s",tx_msg,time_hold);
-  Serial.printf("Message: %s", tx_msg_final);
+  Serial.printf("Message: %s\n", tx_msg_final);
   /* Write frame data to DW IC and prepare transmission. See NOTE 3 below.*/
   dwt_writetxdata(sizeof(tx_msg_final), (uint8_t *)(tx_msg_final), 0); /* Zero offset in TX buffer. */
 
@@ -204,7 +217,7 @@ void TXTime(){
    * nor the other parameters of the dwt_writetxfctrl function, the
    * dwt_writetxfctrl call could be outside the main while(1) loop.
    */
-  dwt_writetxfctrl(sizeof(tx_msg_final), 0, 0); /* Zero offset in TX buffer, no ranging. */
+  dwt_writetxfctrl(sizeof(tx_msg_final) + FCS_LEN, 0, 0); /* Zero offset in TX buffer, no ranging. */
 
   /* Start transmission. */
   dwt_starttx(DWT_START_TX_IMMEDIATE);
@@ -223,10 +236,10 @@ void TXTime(){
   Serial.println("TX Frame Sent");
 
   /* Execute a delay between transmissions. */
+  memset(tx_msg_final, '\0', sizeof(tx_msg_final));
   Sleep(500);
 
   /* Increment the blink frame sequence number (modulo 256). */
-  tx_msg[1]++;
 }
 
 
