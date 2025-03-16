@@ -1,4 +1,6 @@
 //roamingnode2
+#include <WiFi.h>
+#include <esp_wifi.h>
 
 #include "dw3000.h"
 
@@ -41,6 +43,7 @@ extern dwt_txconfig_t txconfig_options;
 unsigned long time_current = 0;
 unsigned long time_offset;
 unsigned long nextRangeCheck = 0;
+char RoamingID[7];
 
 
 void setup()
@@ -86,6 +89,16 @@ void setup()
   dwt_setrxantennadelay(RX_ANT_DLY);
   dwt_settxantennadelay(TX_ANT_DLY);
 
+  Serial.begin(115200);
+
+  WiFi.mode(WIFI_STA);
+  WiFi.STA.begin();
+
+  uint8_t baseMac[6];
+  esp_wifi_get_mac(WIFI_IF_STA, baseMac);
+  snprintf(RoamingID, sizeof(RoamingID), "%02x%02x%02x", baseMac[3], baseMac[4], baseMac[5]);
+  Serial.printf("RoamingID: %s\n", RoamingID);
+
   Serial.println("Roaming Node");
   Serial.println("Setup over........");
 }
@@ -93,20 +106,58 @@ void setup()
 
 void loop()
 {
-  unsigned long now = millis();
-  if (now >= nextRangeCheck) {
-    TimeTx(); // send range request to anchor node
-    nextRangeCheck = now + RNG_DELAY_MS;
+  while (time_current == 0){
+    TimeTx();
+    TimeRx();
   }
+  RangeStart();
+}
 
-  // after transmit, wait for anchor respnse
-  TimeRx();
+void RangeStart(){
+  Serial.println("Pulse Run");
+  char tx_msg[30];
+  time_offset = millis();
+  snprintf(tx_msg, sizeof(tx_msg), "AR");
+
+  int frame_length = (sizeof(tx_msg) + FCS_LEN); // The real length that is going to be transmitted
+
+    /* Write frame data to DW IC and prepare transmission. See NOTE 3 below.*/
+  dwt_writetxdata(frame_length - FCS_LEN, (uint8_t *)tx_msg, 0); /* Zero offset in TX buffer. */
+
+  /* In this example since the length of the transmitted frame does not change,
+   * nor the other parameters of the dwt_writetxfctrl function, the
+   * dwt_writetxfctrl call could be outside the main while(1) loop.
+   */
+  dwt_writetxfctrl(frame_length, 0, 0); /* Zero offset in TX buffer, no ranging. */
+
+  /* Start transmission. */
+  dwt_starttx(DWT_START_TX_IMMEDIATE);
+  
+  delay(10); // Sleep(TX_DELAY_MS);
+
+  /* Poll DW IC until TX frame sent event set. See NOTE 4 below.
+   * STATUS register is 4 bytes long but, as the event we are looking at is in the first byte of the register, we can use this simplest API
+   * function to access it.*/
+  while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS_BIT_MASK))
+  {
+  };
+
+  /* Clear TX frame sent event. */
+  dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS_BIT_MASK);
+
+  test_run_info((unsigned char *)"TX Frame Sent");
+
+  /* Execute a delay between transmissions. */
+  delay(500);
+
+  /* Increment the blink frame sequence number (modulo 256). */
+  return;
 }
 
 
 void TimeTx()
 {
-
+  Serial.println("TimeTx Run");
   char tx_msg[30];
   time_offset = millis();
   snprintf(tx_msg, sizeof(tx_msg), "AT");
@@ -180,9 +231,6 @@ void TimeRx()
   else {
     
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
-  }
-  if (time_current = 0){
-    TimeTx();
   }
   return;
 }

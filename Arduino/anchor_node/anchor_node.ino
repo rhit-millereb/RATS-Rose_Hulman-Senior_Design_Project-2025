@@ -1,4 +1,6 @@
 #include "dw3000.h"
+#include <WiFi.h>
+#include <esp_wifi.h>
 
 #include "DFRobot_GNSS.h"
 
@@ -71,6 +73,7 @@ sLonLat_t lon;
 double high;
 unsigned long time_current;
 char time_hold[20];
+char AnchorID[7];
 
 
 
@@ -140,6 +143,16 @@ void setup()
   Serial.print(":");
   Serial.print(utc.second);
   Serial.println();
+
+  Serial.begin(115200);
+
+  WiFi.mode(WIFI_STA);
+  WiFi.STA.begin();
+
+  uint8_t baseMac[6];
+  esp_wifi_get_mac(WIFI_IF_STA, baseMac);
+  snprintf(AnchorID, sizeof(AnchorID), "%02x%02x%02x", baseMac[3], baseMac[4], baseMac[5]);
+  sprintf("AnchorID: %s\n", AnchorID);
   
   //time_current = (utc.hour*3600000) + (utc.minute*60000) + (utc.second*1000) - millis();
   time_current = (2*3600000) + (47*60000) + (22*1000) - millis();
@@ -152,8 +165,7 @@ void setup()
 }
 
 void loop() {
-  TXTime();
-  //AnchorLoop();
+  AnchorLoop();
 }
 
 void AnchorLoop(){
@@ -237,7 +249,7 @@ void TXTime(){
 
   /* Execute a delay between transmissions. */
   memset(tx_msg_final, '\0', sizeof(tx_msg_final));
-  Sleep(500);
+  delay(500);
 
   /* Increment the blink frame sequence number (modulo 256). */
 }
