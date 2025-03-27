@@ -60,13 +60,21 @@ static dwt_config_t config = {
 uint8_t tx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0};
 uint8_t rx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static uint8_t frame_seq_nb = 0;
-static uint8_t rx_buffer[20];
+static uint8_t rx_buffer[30];
 static uint32_t status_reg = 0;
 static double tof;
 static double distance;
 extern dwt_txconfig_t txconfig_options;
+sTim_t utc;
+sLonLat_t lat;
+sLonLat_t lon;
+double high;
 unsigned long time_current;
-unsigned long time_offset;
+char time_hold[20];
+char AnchorID[7];
+
+
+
 
 void setup()
 {
@@ -75,30 +83,7 @@ void setup()
   spiBegin(PIN_IRQ, PIN_RST);
   spiSelect(PIN_SS);
 
-  delay(2); // Time needed for DW3000 to start up (transition from INIT_RC to IDLE_RC, or could wait for SPIRDY event)
-  
-  Serial.begin(115200);
-  while(!gnss.begin()){
-    Serial.println("NO Deivces !");
-    delay(1000);
-  }
-
-  gnss.enablePower();      // Enable gnss power 
-
-/** Set GNSS to be used 
- *   eGPS              use gps
- *   eBeiDou           use beidou
- *   eGPS_BeiDou       use gps + beidou
- *   eGLONASS          use glonass
- *   eGPS_GLONASS      use gps + glonass
- *   eBeiDou_GLONASS   use beidou +glonass
- *   eGPS_BeiDou_GLONASS use gps + beidou + glonass
- */
-  gnss.setGnss(eGPS_BeiDou_GLONASS);
-
-
-  // gnss.setRgbOff();
-  gnss.setRgbOn();
+  delay(200); // Time needed for DW3000 to start up (transition from INIT_RC to IDLE_RC, or could wait for SPIRDY event)
 
   while (!dwt_checkidlerc()) // Need to make sure DW IC is in IDLE_RC before proceeding
   {
@@ -114,6 +99,8 @@ void setup()
       ;
   }
 
+  dwt_softreset();
+  delay(200);
   // Enabling LEDs here for debug so that for each TX the D1 LED will flash on DW3000 red eval-shield boards.
   dwt_setleds(DWT_LEDS_ENABLE | DWT_LEDS_INIT_BLINK);
 
@@ -121,8 +108,7 @@ void setup()
   if (dwt_configure(&config)) // if the dwt_configure returns DWT_ERROR either the PLL or RX calibration has failed the host should reset the device
   {
     UART_puts("CONFIG FAILED\r\n");
-    while (1)
-      ;
+    while (1);
   }
 
   /* Configure the TX spectrum parameters (power, PG delay and PG count) */
@@ -130,18 +116,55 @@ void setup()
 
   dwt_setrxantennadelay(RX_ANT_DLY);
   dwt_settxantennadelay(TX_ANT_DLY);
+  
+  while(!gnss.begin()){
+    Serial.println("NO Deivces !");
+    delay(1000);
+  }
 
-  Serial.println("Server Node");
+  gnss.enablePower();      // Enable gnss power 
+
+  gnss.setGnss(eGPS);
+
+
+  // gnss.setRgbOff();
+  gnss.setRgbOn();
+
+  utc = gnss.getUTC();
+  lat = gnss.getLat();
+  lon = gnss.getLon();
+  high = gnss.getAlt();
+
+  Serial.print(utc.hour);
+  Serial.print(":");
+  Serial.print(utc.minute);
+  Serial.print(":");
+  Serial.print(utc.second);
+  Serial.println();
+
+  char longitude[13];
+  char latitude[13];
+  sprintf(longitude, "%.6f\n", lon.lonitudeDegree);
+  sprintf(latitude, "%.6f\n", lat.latitudeDegree);
+
+  snprintf(AnchorID, 4, (char *)(longitude + 6));
+  snprintf(AnchorID + 3, 4, (char *)(latitude + 6));
+  
+  //time_current = (utc.hour*3600000) + (utc.minute*60000) + (utc.second*1000) - millis();
+  time_current = (2*3600000) + (47*60000) + (22*1000) - millis();
+
+  snprintf(time_hold, sizeof(time_hold), "%lu", time_current); 
+
+  Serial.println("Anchor Node");
   Serial.println("Setup over........");
 }
 
 void loop() {
   ServerLoop();
-
 }
 
-void ServerLoop(){ //Close to identical to anchor (could be with some communication schema modifications) <- probably not conglomeration
-/* Clear local RX buffer to avoid having leftovers from previous receptions  This is not necessary but is included here to aid reading
+void ServerLoop(){
+  /* Clear local RX buffer to avoid having leftovers from previous receptions  This is not necessary but is included here to aid reading
    * the RX buffer.
    * This is a good place to put a breakpoint. Here (after first time through the loop) the local status register will be set for last event
    * and if a good receive has happened the data buffer will have the data in it, and frame_len will be set to the length of the RX frame. */
@@ -175,7 +198,11 @@ void ServerLoop(){ //Close to identical to anchor (could be with some communicat
     if( rx_buffer[0] == 'S'){
       switch(rx_buffer[1]){
         case 'T':
-          TxTime();
+          delay(300);
+          Ackowledge();
+        case 'P':
+          delay(10);
+          Parse_Anchor(rx_buffer);
       }
     }
   }
@@ -186,15 +213,44 @@ void ServerLoop(){ //Close to identical to anchor (could be with some communicat
   }
 }
 
-void TxTime(){
- //Send time to roaming node (Can global)
+void Parse_Anchor(uint8_t instruction[30]){
+//TODO Parse info from roaming node and forward to server node (also find better name for this)
 }
 
-void AnchorInit(){
-  // Has recieved anchor request for server location will communicate it is within range creating server distance of 1 in anchor (Alternative is global general communication (couldwrk (ask)))
-}
+void Ackowledge(){
+  char newInstruction[10];
+  Serial.println("TimeTx Starting \n");
+  uint8_t tx_msg[2];
+  char tx_msg_final[30];
+  tx_msg[0] = 'A';
+  tx_msg[1] = 'K';
+  Serial.printf("Message: %s\n", tx_msg);
+  /* Write frame data to DW IC and prepare transmission. See NOTE 3 below.*/
+  dwt_writetxdata(sizeof(tx_msg), (uint8_t *)(tx_msg), 0); /* Zero offset in TX buffer. */
 
-void StoreRange(){
-  // Store the ranges accumulated from anchor nodes (sort in groups of three) <- triple connected hash map? (Is that even a thing)
-}
+  /* In this example since the length of the transmitted frame does not change,
+   * nor the other parameters of the dwt_writetxfctrl function, the
+   * dwt_writetxfctrl call could be outside the main while(1) loop.
+   */
+  dwt_writetxfctrl(sizeof(tx_msg_final) + FCS_LEN, 0, 0); /* Zero offset in TX buffer, no ranging. */
 
+  /* Start transmission. */
+  dwt_starttx(DWT_START_TX_IMMEDIATE);
+  delay(10); // Sleep(TX_DELAY_MS);
+
+  /* Poll DW IC until TX frame sent event set. See NOTE 4 below.
+   * STATUS register is 4 bytes long but, as the event we are looking at is in the first byte of the register, we can use this simplest API
+   * function to access it.*/
+  while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS_BIT_MASK))
+  {
+  };
+
+  /* Clear TX frame sent event. */
+  dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS_BIT_MASK);
+
+  Serial.println("TX Frame Sent");
+
+  /* Execute a delay between transmissions. */
+  memset(tx_msg_final, '\0', sizeof(tx_msg_final));
+  delay(500);
+}

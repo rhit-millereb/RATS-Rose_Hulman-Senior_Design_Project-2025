@@ -58,7 +58,7 @@ static dwt_config_t config = {
 };
 
 uint8_t tx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0};
-uint8_t rx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+uint8_t rx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static uint8_t frame_seq_nb = 0;
 static uint8_t rx_buffer[30];
 static uint32_t status_reg = 0;
@@ -151,12 +151,15 @@ void setup()
   snprintf(AnchorID + 3, 4, (char *)(latitude + 6));
   
   //time_current = (utc.hour*3600000) + (utc.minute*60000) + (utc.second*1000) - millis();
-  time_current = (2*3600000) + (47*60000) + (22*1000) - millis();
+  time_current = (2*3600000000) + (47*60000000) + (22*1000000) - micros();
 
   snprintf(time_hold, sizeof(time_hold), "%lu", time_current); 
 
   Serial.println("Anchor Node");
   Serial.println("Setup over........");
+  While(!Ack){
+    AnchorInformServer();
+  }
 }
 
 void loop() {
@@ -213,61 +216,180 @@ void AnchorLoop(){
   }
 }
 
-void RangeForward(uint8_t instruction[30]){
-  Serial.printf("Base Instruction%s\n",instruction);
-  char RoamingID[7]; 
-  char RoamingTime[9];
-  snprintf(RoamingID, 7, (char *)(instruction + 2));
-  printf("Roaming ID: %s\n", RoamingID);
-  snprintf(RoamingTime, 9, (char *)(instruction + 8));
-  printf("Roaming Time: %s\n", RoamingTime);
-  //TODO fill newInstruction with TOF value
-  char newInstruction[10];
+void Range_Tx(){
+  /* Write frame data to DW IC and prepare transmission. See NOTE 7 below. */
+  tx_poll_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
+  dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS_BIT_MASK);
+  dwt_writetxdata(sizeof(tx_poll_msg), tx_poll_msg, 0); /* Zero offset in TX buffer. */
+  dwt_writetxfctrl(sizeof(tx_poll_msg), 0, 1);          /* Zero offset in TX buffer, ranging. */
+
+  /* Start transmission, indicating that a response is expected so that reception is enabled automatically after the frame is sent and the delay
+   * set by dwt_setrxaftertxdelay() has elapsed. */
+  dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+
+  /* We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout. See NOTE 8 below. */
+  while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG_BIT_MASK | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)))
+  {
+  };
+
+  /* Increment frame sequence number after transmission of the poll message (modulo 256). */
+  frame_seq_nb++;
+
+  if (status_reg & SYS_STATUS_RXFCG_BIT_MASK)
+  {
+    uint32_t frame_len;
+
+    /* Clear good RX frame event in the DW IC status register. */
+    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG_BIT_MASK);
+
+    /* A frame has been received, read it into the local buffer. */
+    frame_len = dwt_read32bitreg(RX_FINFO_ID) & RXFLEN_MASK;
+    if (frame_len <= sizeof(rx_buffer))
+    {
+      dwt_readrxdata(rx_buffer, frame_len, 0);
+
+      /* Check that the frame is the expected response from the companion "SS TWR responder" example.
+       * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
+      rx_buffer[ALL_MSG_SN_IDX] = 0;
+      if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) == 0)
+      {
+        uint32_t poll_tx_ts, resp_rx_ts, poll_rx_ts, resp_tx_ts;
+        int32_t rtd_init, rtd_resp;
+        float clockOffsetRatio;
+
+        /* Retrieve poll transmission and response reception timestamps. See NOTE 9 below. */
+        poll_tx_ts = dwt_readtxtimestamplo32();
+        resp_rx_ts = dwt_readrxtimestamplo32();
+
+        /* Read carrier integrator value and calculate clock offset ratio. See NOTE 11 below. */
+        clockOffsetRatio = ((float)dwt_readclockoffset()) / (uint32_t)(1 << 26);
+
+        /* Get timestamps embedded in response message. */
+        resp_msg_get_ts(&rx_buffer[RESP_MSG_POLL_RX_TS_IDX], &poll_rx_ts);
+        resp_msg_get_ts(&rx_buffer[RESP_MSG_RESP_TX_TS_IDX], &resp_tx_ts);
+
+        /* Compute time of flight and distance, using clock offset ratio to correct for differing local and remote clock rates */
+        rtd_init = resp_rx_ts - poll_tx_ts;
+        rtd_resp = resp_tx_ts - poll_rx_ts;
+
+        tof = ((rtd_init - rtd_resp * (1 - clockOffsetRatio)) / 2.0) * DWT_TIME_UNITS;
+        distance = tof * SPEED_OF_LIGHT;
+
+        /* Display computed distance on LCD. */
+        snprintf(dist_str, sizeof(dist_str), "DIST: %3.2f m", distance-0.4);
+        test_run_info((unsigned char *)dist_str);
+      }
+    }
+  }
+  else
+  {
+    /* Clear RX error/timeout events in the DW IC status register. */
+    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
+  }
+
+
+}
+
+// void RangeForward(uint8_t instruction[30]){
+//   Serial.printf("Base Instruction %s\n",instruction);
+//   char RoamingID[7]; 
+//   char RoamingTime[9];
+//   snprintf(RoamingID, 7, (char *)(instruction + 2));
+//   printf("Roaming ID: %s\n", RoamingID);
+//   snprintf(RoamingTime, 11, (char *)(instruction + 8));
+//   printf("Roaming Time: %s\n", RoamingTime);
+//   unsigned long int TimeOfFlight;
+//   Serial.printf("time_curret: %lu\n", time_current);
+//   Serial.printf("micros: %lu\n", micros());
+//   TimeOfFlight = (time_current + micros() - strtoul(RoamingTime,NULL, 10)); //TODO Check if this works 
+//   double TOF = ((double)(TimeOfFlight)/(double)(SPEED_OF_LIGHT/1000000));
+//   Serial.printf("Time Diff: %lu\n", TimeOfFlight);
+//   Serial.printf("TOF:%fl\n", TOF);
+//   Serial.println("TimeTx Starting \n");
+//   uint8_t tx_msg[2];
+//   char tx_msg_final[30];
+//   tx_msg[0] = 'S';
+//   tx_msg[1] = 'P';
+//   snprintf(tx_msg_final, sizeof(tx_msg_final), "%s%s%lu",AnchorID,RoamingID,TimeOfFlight);
+//   Serial.printf("Message: %s\n", tx_msg_final);
+//   /* Write frame data to DW IC and prepare transmission. See NOTE 3 below.*/
+//   dwt_writetxdata(sizeof(tx_msg_final), (uint8_t *)(tx_msg_final), 0); /* Zero offset in TX buffer. */
+
+//   /* In this example since the length of the transmitted frame does not change,
+//    * nor the other parameters of the dwt_writetxfctrl function, the
+//    * dwt_writetxfctrl call could be outside the main while(1) loop.
+//    */
+//   dwt_writetxfctrl(sizeof(tx_msg_final) + FCS_LEN, 0, 0); /* Zero offset in TX buffer, no ranging. */
+
+//   /* Start transmission. */
+//   dwt_starttx(DWT_START_TX_IMMEDIATE);
+//   delay(10); // Sleep(TX_DELAY_MS);
+
+//   /* Poll DW IC until TX frame sent event set. See NOTE 4 below.
+//    * STATUS register is 4 bytes long but, as the event we are looking at is in the first byte of the register, we can use this simplest API
+//    * function to access it.*/
+//   while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS_BIT_MASK))
+//   {
+//   };
+
+//   /* Clear TX frame sent event. */
+//   dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS_BIT_MASK);
+
+//   Serial.println("TX Frame Sent");
+
+//   /* Execute a delay between transmissions. */
+//   memset(tx_msg_final, '\0', sizeof(tx_msg_final));
+//   delay(500);
+
+// }
+
+// void TXTime(){
+//   uint8_t tx_msg[2];
+//   char tx_msg_final[30];
+//   tx_msg[0] = 'R';
+//   tx_msg[1] = 'T';
+//   snprintf(tx_msg_final, sizeof(tx_msg_final), "%s%s",tx_msg,time_hold);
+//   Serial.printf("Message: %s\n", tx_msg_final);
+//   /* Write frame data to DW IC and prepare transmission. See NOTE 3 below.*/
+//   dwt_writetxdata(sizeof(tx_msg_final), (uint8_t *)(tx_msg_final), 0); /* Zero offset in TX buffer. */
+
+//   /* In this example since the length of the transmitted frame does not change,
+//    * nor the other parameters of the dwt_writetxfctrl function, the
+//    * dwt_writetxfctrl call could be outside the main while(1) loop.
+//    */
+//   dwt_writetxfctrl(sizeof(tx_msg_final) + FCS_LEN, 0, 0); /* Zero offset in TX buffer, no ranging. */
+
+//   /* Start transmission. */
+//   dwt_starttx(DWT_START_TX_IMMEDIATE);
+//   delay(10); // Sleep(TX_DELAY_MS);
+
+//   /* Poll DW IC until TX frame sent event set. See NOTE 4 below.
+//    * STATUS register is 4 bytes long but, as the event we are looking at is in the first byte of the register, we can use this simplest API
+//    * function to access it.*/
+//   while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS_BIT_MASK))
+//   {
+//   };
+
+//   /* Clear TX frame sent event. */
+//   dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS_BIT_MASK);
+
+//   Serial.println("TX Frame Sent");
+
+//   /* Execute a delay between transmissions. */
+//   memset(tx_msg_final, '\0', sizeof(tx_msg_final));
+//   delay(500);
+
+//   /* Increment the blink frame sequence number (modulo 256). */
+// }
+
+void AnchorInformServer(){
+  //TODO ensure functionality and tx_msg[1] validity
   Serial.println("TimeTx Starting \n");
   uint8_t tx_msg[2];
   char tx_msg_final[30];
   tx_msg[0] = 'S';
-  tx_msg[1] = 'P';
-  snprintf(tx_msg_final, sizeof(tx_msg_final), "%s%s%s",AnchorID,RoamingID,newInstruction);
-  Serial.printf("Message: %s\n", tx_msg_final);
-  /* Write frame data to DW IC and prepare transmission. See NOTE 3 below.*/
-  dwt_writetxdata(sizeof(tx_msg_final), (uint8_t *)(tx_msg_final), 0); /* Zero offset in TX buffer. */
-
-  /* In this example since the length of the transmitted frame does not change,
-   * nor the other parameters of the dwt_writetxfctrl function, the
-   * dwt_writetxfctrl call could be outside the main while(1) loop.
-   */
-  dwt_writetxfctrl(sizeof(tx_msg_final) + FCS_LEN, 0, 0); /* Zero offset in TX buffer, no ranging. */
-
-  /* Start transmission. */
-  dwt_starttx(DWT_START_TX_IMMEDIATE);
-  delay(10); // Sleep(TX_DELAY_MS);
-
-  /* Poll DW IC until TX frame sent event set. See NOTE 4 below.
-   * STATUS register is 4 bytes long but, as the event we are looking at is in the first byte of the register, we can use this simplest API
-   * function to access it.*/
-  while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS_BIT_MASK))
-  {
-  };
-
-  /* Clear TX frame sent event. */
-  dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS_BIT_MASK);
-
-  Serial.println("TX Frame Sent");
-
-  /* Execute a delay between transmissions. */
-  memset(tx_msg_final, '\0', sizeof(tx_msg_final));
-  delay(500);
-
-}
-
-void TXTime(){
-  Serial.println("TimeTx Starting \n");
-  uint8_t tx_msg[2];
-  char tx_msg_final[30];
-  tx_msg[0] = 'R';
-  tx_msg[1] = 'T';
-  snprintf(tx_msg_final, sizeof(tx_msg_final), "%s%s",tx_msg,time_hold);
+  tx_msg[1] = 'L';
+  snprintf(tx_msg_final, sizeof(tx_msg_final), "%s%.6f%.6f",tx_msg,lon.lonitudeDegree,lat.latitudeDegree );
   Serial.printf("Message: %s\n", tx_msg_final);
   /* Write frame data to DW IC and prepare transmission. See NOTE 3 below.*/
   dwt_writetxdata(sizeof(tx_msg_final), (uint8_t *)(tx_msg_final), 0); /* Zero offset in TX buffer. */
