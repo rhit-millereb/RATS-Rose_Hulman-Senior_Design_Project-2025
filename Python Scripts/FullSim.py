@@ -8,10 +8,10 @@ from matplotlib.patches import Ellipse
 
 def main():
     P1 = numpy.array([0.0,0.0,0.0])
-    P2 = numpy.array([1.0,0.0,0.0])
-    P3 = numpy.array([0.5,1,0.0])
+    P2 = numpy.array([4.5,0.0,0.0])
+    P3 = numpy.array([2,1.5,0.0])
     Roams = [0] * 1
-    Roams[0] = numpy.array([1.5,0.5,0.0])
+    Roams[0] = numpy.array([2.0,0,0.0])
     #find_error(P1,P2,P3,Roams[0])
     node_sim(P1,P2,P3,Roams)
     
@@ -99,9 +99,9 @@ def find_error(P1, P2, P3, Roam):
 
 def findrange(P1, P2, P3, Roam):
     ranges = [0, 0, 0]
-    ranges[0] = 1.5#sqrt(pow(P1[0]- Roam[0],2)+pow(P1[1]-Roam[1],2)+pow(P1[2]-Roam[2],2)) + random.uniform(-0.05,0.05)
-    ranges[1] = 0.93#sqrt(pow(P2[0]- Roam[0],2)+pow(P2[1]-Roam[1],2)+pow(P2[2]-Roam[2],2)) + random.uniform(-0.05,0.05)
-    ranges[2] = 1.16#sqrt(pow(P3[0]- Roam[0],2)+pow(P3[1]-Roam[1],2)+pow(P3[2]-Roam[2],2)) + random.uniform(-0.05,0.05)
+    ranges[0] = 2#sqrt(pow(P1[0]- Roam[0],2)+pow(P1[1]-Roam[1],2)+pow(P1[2]-Roam[2],2)) + random.uniform(-0.05,0.05)
+    ranges[1] = 2.5#sqrt(pow(P2[0]- Roam[0],2)+pow(P2[1]-Roam[1],2)+pow(P2[2]-Roam[2],2)) + random.uniform(-0.05,0.05)
+    ranges[2] = 1.5#sqrt(pow(P3[0]- Roam[0],2)+pow(P3[1]-Roam[1],2)+pow(P3[2]-Roam[2],2)) + random.uniform(-0.05,0.05)
     
     return ranges
 
